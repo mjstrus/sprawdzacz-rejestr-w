@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weryfikator VAT — Enova vs KSeF</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; }
+
+    /* HEADER */
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+      border-radius: 14px;
+      padding: 22px 28px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .header-icon { font-size: 38px; }
+    .header h1 { color: #f8fafc; font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+    .header p { color: #94a3b8; font-size: 13px; margin-top: 3px; }
+    .header-badge {
+      margin-left: auto;
+      background: #1d4ed8;
+      color: #fff;
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* CARD */
+    .card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+
+    /* UPLOAD GRID */
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media(max-width: 640px) { .upload-grid { grid-template-columns: 1fr; } }
+
+    .dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 22px 14px;
+      text-align: center;
+      cursor: pointer;
+      background: #f8fafc;
+      transition: all .15s;
+      min-height: 105px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    .dropzone:hover { border-color: #3b82f6; background: #eff6ff; }
+    .dropzone.active { border-color: #3b82f6; background: #eff6ff; }
+    .dropzone.filled { border-color: #22c55e; background: #f0fdf4; border-style: solid; }
+    .dz-icon { font-size: 28px; margin-bottom: 6px; }
+    .dz-title { font-weight: 600; color: #475569; font-size: 14px; }
+    .dz-sub { color: #94a3b8; font-size: 12px; margin-top: 3px; }
+    .dz-name { font-weight: 700; color: #166534; font-size: 13px; }
+    .dz-size { color: #64748b; font-size: 11px; margin-top: 2px; }
+    .chip { display: inline-block; background: #dcfce7; color: #166534; border-radius: 5px; padding: 1px 7px; font-size: 11px; margin: 2px; }
+    .btn-clear { margin-top: 8px; font-size: 11px; color: #ef4444; background: none; border: none; cursor: pointer; text-decoration: underline; }
+
+    /* BUTTONS */
+    .btn-primary {
+      width: 100%;
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn-primary:hover:not(:disabled) { background: #1e40af; }
+    .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-export {
+      background: #0f172a; color: #fff; border: none; border-radius: 8px;
+      padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-export:hover { background: #1e293b; }
+
+    /* MESSAGES */
+    .msg-error { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; color: #b91c1c; font-size: 13px; margin-bottom: 14px; }
+    .msg-info {
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px;
+      padding: 12px 16px; color: #1d4ed8; font-size: 13px; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid #bfdbfe;
+      border-top-color: #1d4ed8; border-radius: 50%;
+      animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* REGISTER META */
+    .reg-meta {
+      background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #3b82f6;
+      border-radius: 10px; padding: 12px 18px; margin-bottom: 14px;
+      display: flex; gap: 28px; flex-wrap: wrap; font-size: 13px;
+    }
+    .reg-meta span { color: #64748b; }
+    .reg-meta strong { color: #0f172a; }
+
+    /* SUMMARY */
+    .summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+    .sum-box { border-radius: 10px; padding: 10px 18px; font-weight: 700; font-size: 13px; min-width: 115px; text-align: center; line-height: 1.4; }
+    .sum-box .num { font-size: 24px; display: block; }
+    .sum-ok     { background: #d1fae5; color: #065f46; }
+    .sum-bad    { background: #fee2e2; color: #991b1b; }
+    .sum-warn   { background: #fef3c7; color: #92400e; }
+    .sum-purple { background: #ede9fe; color: #4c1d95; }
+    .sum-gray   { background: #f1f5f9; color: #475569; }
+
+    /* TABLE */
+    .tbl-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 14px; }
+    .tbl-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    thead th {
+      background: #f1f5f9; padding: 9px 11px; text-align: left;
+      font-weight: 700; color: #475569; border-bottom: 2px solid #e2e8f0;
+      white-space: nowrap; font-size: 11.5px;
+    }
+    tbody td { padding: 8px 11px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr.row-data:hover td { background: #f8fafc; }
+    .tr-expand td { background: #fffbeb !important; padding: 6px 11px 12px; }
+
+    .badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .badge-ok     { background: #d1fae5; color: #065f46; }
+    .badge-bad    { background: #fee2e2; color: #991b1b; }
+    .badge-warn   { background: #fef3c7; color: #92400e; }
+    .badge-purple { background: #ede9fe; color: #4c1d95; }
+    .badge-gray   { background: #f1f5f9; color: #475569; }
+
+    .issues { margin: 4px 0 0 16px; color: #b91c1c; font-size: 12px; line-height: 1.9; }
+    .btn-toggle {
+      background: none; border: 1px solid #e2e8f0; border-radius: 5px;
+      padding: 2px 9px; font-size: 11px; cursor: pointer; color: #64748b;
+    }
+    .btn-toggle:hover { background: #f1f5f9; }
+    .cell-old { color: #991b1b; text-decoration: line-through; font-size: 11px; margin-right: 3px; }
+    .cell-new { color: #065f46; font-weight: 600; }
+    .cell-nil { color: #94a3b8; }
+
+    /* TABS */
+    .tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+    .tab {
+      padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+      transition: all .12s;
+    }
+    .tab.active { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
+
+    /* FILTER BAR */
+    .filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+    .filter-bar input {
+      border: 1px solid #e2e8f0; border-radius: 7px; padding: 7px 12px;
+      font-size: 13px; outline: none; flex: 1; min-width: 180px;
+    }
+    .filter-bar input:focus { border-color: #3b82f6; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-icon">🧾</div>
+    <div>
+      <h1>Weryfikator VAT — Enova 365 vs KSeF</h1>
+      <p>Porównaj rejestr VAT z Enova (XLSX) z plikiem JPK_FA (XML) — weryfikacja dat, kwot i stawek VAT</p>
+    </div>
+    <div class="header-badge">enova365 · JPK_FA</div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="card">
+    <div class="card-title">1. Wgraj pliki</div>
+    <div class="upload-grid">
+
+      <!-- XLSX -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
+          Rejestr VAT z Enova 365 (XLSX)
+        </div>
+        <label>
+          <input type="file" id="xlsxInput" accept=".xlsx,.xls" style="display:none" onchange="onXlsxChange(event)" />
+          <div class="dropzone" id="xlsxZone"
+               ondragover="onDragOver(event,'xlsxZone')"
+               ondragleave="onDragLeave('xlsxZone')"
+               ondrop="onDropXlsx(event)">
+            <div id="xlsxContent">
+              <div class="dz-icon">📊</div>
+              <div class="dz-title">Upuść plik XLSX lub kliknij</div>
+              <div class="dz-sub">Rejestr VAT naliczony lub należny</div>
+            </div>
+          </div>
+        </label>
+      </div>
+
+      <!-- XML -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
+          Faktury JPK_FA (XML)
+        </div>
+        <label>
+          <input type="file" id="xmlInput" accept=".xml" multiple style="display:none" onchange="onXmlChange(event)" />
+          <div class="dropzone" id="xmlZone"
+               ondragover="onDragOver(event,'xmlZone')"
+               ondragleave="onDragLeave('xmlZone')"
+               ondrop="onDropXml(event)">
+            <div id="xmlContent">
+              <div class="dz-icon">📎</div>
+              <div class="dz-title">Upuść plik XML lub kliknij</div>
+              <div class="dz-sub">Eksport JPK_FA z Enova 365</div>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btnAnalyze" disabled onclick="runAnalysis()">
+      🔍 Analizuj i porównaj
+    </button>
+  </div>
+
+  <!-- MESSAGES -->
+  <div id="msgArea"></div>
+
+  <!-- RESULTS -->
+  <div id="results"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let xlsxFile = null;
+let xmlFiles = [];
+let expandedRows = new Set();
+let currentFilter = 'all';
+let searchText = '';
+let lastResults = null;
+let lastRegister = null;
+
+// ═══════════════════════════════════════════════════════
+// DRAG & DROP
+// ═══════════════════════════════════════════════════════
+function onDragOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('active'); }
+function onDragLeave(id)   { document.getElementById(id).classList.remove('active'); }
+
+function onDropXlsx(e) {
+  e.preventDefault(); onDragLeave('xlsxZone');
+  const f = e.dataTransfer.files[0];
+  if (f) setXlsx(f);
+}
+function onDropXml(e) {
+  e.preventDefault(); onDragLeave('xmlZone');
+  addXmlFiles(Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.xml')));
+}
+function onXlsxChange(e) { if (e.target.files[0]) setXlsx(e.target.files[0]); }
+function onXmlChange(e)  { addXmlFiles(Array.from(e.target.files)); }
+
+function setXlsx(f) {
+  xlsxFile = f;
+  const zone = document.getElementById('xlsxZone');
+  zone.classList.add('filled');
+  document.getElementById('xlsxContent').innerHTML = `
+    <div class="dz-icon">📊</div>
+    <div class="dz-name">${esc(f.name)}</div>
+    <div class="dz-size">${(f.size/1024).toFixed(0)} KB · XLSX</div>`;
+  checkReady();
+}
+
+function addXmlFiles(files) {
+  const existing = new Set(xmlFiles.map(f => f.name));
+  files.forEach(f => { if (!existing.has(f.name)) xmlFiles.push(f); });
+  renderXmlZone();
+  checkReady();
+}
+function clearXml() { xmlFiles = []; renderXmlZone(); checkReady(); }
+
+function renderXmlZone() {
+  const zone = document.getElementById('xmlZone');
+  if (!xmlFiles.length) {
+    zone.classList.remove('filled');
+    document.getElementById('xmlContent').innerHTML = `
+      <div class="dz-icon">📎</div>
+      <div class="dz-title">Upuść pliki XML lub kliknij</div>
+      <div class="dz-sub">Faktury w formacie KSeF FA(2)</div>`;
+    return;
+  }
+  zone.classList.add('filled');
+  const chips = xmlFiles.slice(0,5).map(f => `<span class="chip">${esc(f.name)}</span>`).join('');
+  const more  = xmlFiles.length > 5 ? `<span class="chip">+${xmlFiles.length-5}</span>` : '';
+  document.getElementById('xmlContent').innerHTML = `
+    <div class="dz-icon">📂</div>
+    <div class="dz-name">${xmlFiles.length} plik(ów) XML</div>
+    <div style="margin-top:6px">${chips}${more}</div>
+    <button class="btn-clear" onclick="event.preventDefault();clearXml()">Wyczyść</button>`;
+}
+
+function checkReady() {
+  document.getElementById('btnAnalyze').disabled = !(xlsxFile && xmlFiles.length);
+}
+
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmt(v) {
+  if (v == null) return '<span class="cell-nil">—</span>';
+  if (typeof v !== 'number') return esc(v);
+  return v.toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' zł';
+}
+function fmtRaw(v) {
+  if (v == null) return '—';
+  if (typeof v !== 'number') return String(v);
+  return v.toLocaleString('pl-PL', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' zł';
+}
+function setMsg(html) { document.getElementById('msgArea').innerHTML = html; }
+function readFileAsArrayBuffer(f) {
+  return new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('Błąd odczytu')); r.readAsArrayBuffer(f); });
+}
+function readFileAsText(f) {
+  return new Promise((res,rej) => { const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error('Błąd odczytu')); r.readAsText(f,'UTF-8'); });
+}
+
+// ═══════════════════════════════════════════════════════
+// ENOVA XLSX PARSER
+// ═══════════════════════════════════════════════════════
+function parseEnovaXlsx(arrayBuffer) {
+  const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+
+  // Extract metadata from header rows
+  let firma = null, nip = null, okres = null, typRejestru = null;
+  for (let i = 0; i < Math.min(12, rows.length); i++) {
+    const row = rows[i];
+    const rowText = row.filter(Boolean).join(' ');
+    if (i === 0 && row[0]) firma = String(row[0]).trim();
+    if (rowText.includes('NIP:') && !nip) {
+      const m = rowText.match(/NIP:\s*([\d]+)/);
+      if (m) nip = m[1];
+    }
+    if (rowText.includes('Naliczony')) typRejestru = 'zakup';
+    if (rowText.includes('Należny'))   typRejestru = 'sprzedaz';
+    if (rowText.includes('Za okres:')) {
+      const m = rowText.match(/Za okres:\s*([^\n;]+)/);
+      if (m) okres = m[1].trim();
+    }
+  }
+
+  // Find header row (where col A = 'Lp.')
+  let headerRow = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i][0] === 'Lp.') { headerRow = i; break; }
+  }
+  if (headerRow < 0) throw new Error('Nie znaleziono nagłówka tabeli (szukam "Lp.")');
+
+  const entries = [];
+  let i = headerRow + 2; // skip both header rows
+
+  while (i < rows.length) {
+    const r1 = rows[i];
+    const r2 = rows[i+1] || [];
+
+    // Stop at summary/footer
+    if (r1[2] === 'Suma:' || r1[0] === '1/1' || (typeof r1[0] === 'string' && r1[0].includes('Data i czas'))) break;
+
+    if (typeof r1[0] === 'number') {
+      // Parse kontrahent field: "Nazwa\nNIP adres"
+      const podmiotRaw = String(r1[4] || '');
+      const lines = podmiotRaw.split('\n');
+      const nazwa = lines[0].trim();
+      const nipAdres = lines[1] ? lines[1].trim() : '';
+      const nipKtr = nipAdres.split(' ')[0] || null;
+
+      entries.push({
+        lp:              r1[0],
+        nr_ewid:         r1[2] ? String(r1[2]).trim() : null,
+        data_rozrachunku:r1[3] ? String(r1[3]).trim() : null,
+        kontrahent:      nazwa,
+        nip:             nipKtr,
+        netto_23:        r1[13] ?? null,
+        netto_8:         r1[14] ?? null,
+        netto_5:         r1[15] ?? null,
+        netto_0:         r1[17] ?? null,
+        netto:           r1[18] ?? null,
+        brutto:          r1[19] ?? null,
+        // Row 2
+        nr_dok:          r2[2] ? String(r2[2]).trim() : null,
+        data_dok:        r2[3] ? String(r2[3]).trim() : null,
+        nr_ksef:         r2[4] ? String(r2[4]).trim() : null,
+        ozn_ksef:        r2[6] ? String(r2[6]).trim() : null,
+        vat_23:          r2[13] ?? null,
+        vat_8:           r2[14] ?? null,
+        vat_5:           r2[15] ?? null,
+        vat:             r2[18] ?? null,
+      });
+      i += 2;
+    } else {
+      i++;
+    }
+  }
+
+  return { firma, nip, okres, typRejestru, entries };
+}
+
+// ═══════════════════════════════════════════════════════
+// JPK_FA XML PARSER (format Enova 365)
+// Jeden plik = wiele faktur w tagach <Faktura>
+// ═══════════════════════════════════════════════════════
+function parseJpkFaXml(xmlText, fileName) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const ns = 'http://jpk.mf.gov.pl/wzor/2022/02/17/02171/';
+
+    const getEl = (parent, tag) =>
+      parent.getElementsByTagNameNS(ns, tag)[0] || parent.getElementsByTagName(tag)[0];
+    const getVal = (parent, tag) => {
+      const el = getEl(parent, tag);
+      return el ? el.textContent.trim() : null;
+    };
+    const getNum = (parent, tag) => {
+      const v = getVal(parent, tag);
+      return v ? Math.round(parseFloat(v.replace(',','.')) * 100) / 100 : null;
+    };
+
+    const faktury = Array.from(
+      doc.getElementsByTagNameNS(ns, 'Faktura').length
+        ? doc.getElementsByTagNameNS(ns, 'Faktura')
+        : doc.getElementsByTagName('Faktura')
+    );
+
+    if (!faktury.length) throw new Error('Brak tagów <Faktura> w pliku');
+
+    return faktury.map(f => {
+      // Sumy per stawka: P_13_1=23%, P_13_2=8%, P_13_3=5%
+      //                  P_14_1=23%, P_14_2=8%, P_14_3=5%
+      const netto23 = getNum(f,'P_13_1'), vat23 = getNum(f,'P_14_1');
+      const netto8  = getNum(f,'P_13_2'), vat8  = getNum(f,'P_14_2');
+      const netto5  = getNum(f,'P_13_3'), vat5  = getNum(f,'P_14_3');
+      const brutto  = getNum(f,'P_15');
+
+      const netto = Math.round(([netto23,netto8,netto5].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
+      const vat   = Math.round(([vat23,vat8,vat5].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
+
+      // Stawki obecne w fakturze
+      const stawki = [];
+      if (netto23 != null) stawki.push('23%');
+      if (netto8  != null) stawki.push('8%');
+      if (netto5  != null) stawki.push('5%');
+
+      return {
+        fileName,
+        nrFaktury: getVal(f,'P_2A'),
+        nrKsef:    null, // JPK_FA nie zawiera numeru KSeF
+        dataWyst:  getVal(f,'P_1'),
+        dataSprz:  getVal(f,'P_6') || getVal(f,'P_1'),
+        nipSprzed: getVal(f,'P_4B'),
+        kontrahent:getVal(f,'P_3C'),
+        netto23, vat23, netto8, vat8, netto5, vat5,
+        netto:  netto || null,
+        vat:    vat   || null,
+        brutto: brutto|| null,
+        stawki: stawki.join(', ') || '—',
+      };
+    });
+  } catch(e) {
+    return [{ fileName, error: e.message }];
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// COMPARISON
+// ═══════════════════════════════════════════════════════
+function compare(enovaEntries, ksefDocs) {
+  const TOL = 0.02;
+  const norm = s => String(s||'').replace(/[\s\/\-]/g,'').toUpperCase();
+  const results = [];
+
+  // For each KSeF doc — find match in Enova by nr_dok or nr_ksef
+  ksefDocs.forEach(ksef => {
+    if (ksef.error) {
+      results.push({ ksef, enova: null, status: 'xml_error', issues: [`Błąd XML: ${ksef.error}`] });
+      return;
+    }
+
+    const match = enovaEntries.find(e =>
+      (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok)  === norm(ksef.nrFaktury)) ||
+      (e.nr_ksef && ksef.nrKsef    && norm(e.nr_ksef) === norm(ksef.nrKsef))
+    );
+
+    if (!match) {
+      results.push({ ksef, enova: null, status: 'not_found', issues: [`Faktura ${ksef.nrFaktury || ksef.nrKsef || '?'} nie znaleziona w rejestrze Enova`] });
+      return;
+    }
+
+    const issues = [];
+
+    // Kwoty
+    if (match.netto != null && ksef.netto && Math.abs(match.netto - ksef.netto) > TOL)
+      issues.push(`Netto: Enova ${fmtRaw(match.netto)} ≠ KSeF ${fmtRaw(ksef.netto)}`);
+    if (match.vat != null && ksef.vat && Math.abs(match.vat - ksef.vat) > TOL)
+      issues.push(`VAT: Enova ${fmtRaw(match.vat)} ≠ KSeF ${fmtRaw(ksef.vat)}`);
+    if (match.brutto != null && ksef.brutto && Math.abs(match.brutto - ksef.brutto) > TOL)
+      issues.push(`Brutto: Enova ${fmtRaw(match.brutto)} ≠ KSeF ${fmtRaw(ksef.brutto)}`);
+
+    // Daty — porównaj dd.MM.yyyy z yyyy-MM-dd
+    const normDate = s => {
+      if (!s) return null;
+      const m = String(s).match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+      return m ? `${m[3]}-${m[2]}-${m[1]}` : String(s).substring(0,10);
+    };
+    const enovaDataDok = normDate(match.data_dok);
+    const ksefDataWyst = normDate(ksef.dataWyst);
+    const ksefDataSprz = normDate(ksef.dataSprz);
+
+    if (enovaDataDok && ksefDataWyst && enovaDataDok !== ksefDataWyst)
+      issues.push(`Data dok.: Enova ${match.data_dok} ≠ KSeF ${ksef.dataWyst}`);
+    if (ksefDataSprz && enovaDataDok && ksefDataSprz !== ksefDataWyst)  {
+      // only flag if data sprzedazy differs from data wystawienia — it's noteworthy
+      // We don't have explicit data_sprzedazy in Enova register, just flag if exists and differs
+    }
+
+    // Numer KSeF — jeśli faktura ma numer KSeF w rejestrze, sprawdź czy zgadza się z XML
+    if (match.nr_ksef && ksef.nrKsef && norm(match.nr_ksef) !== norm(ksef.nrKsef))
+      issues.push(`Nr KSeF: Enova ${match.nr_ksef} ≠ XML ${ksef.nrKsef}`);
+
+    // BFK — faktura bez numeru KSeF w rejestrze ale plik XML ma numer
+    if (match.ozn_ksef === 'BFK' && ksef.nrKsef)
+      issues.push(`Oznaczenie BFK w rejestrze, ale plik KSeF zawiera numer: ${ksef.nrKsef}`);
+
+    results.push({ ksef, enova: match, status: issues.length ? 'mismatch' : 'ok', issues });
+  });
+
+  // Enova entries without matching KSeF file
+  enovaEntries.forEach(e => {
+    const found = ksefDocs.find(k =>
+      (e.nr_dok  && k.nrFaktury && norm(e.nr_dok)  === norm(k.nrFaktury)) ||
+      (e.nr_ksef && k.nrKsef    && norm(e.nr_ksef) === norm(k.nrKsef))
+    );
+    if (!found) {
+      const reason = e.ozn_ksef === 'BFK' ? '(oznaczone BFK — brak obowiązku KSeF)' : '';
+      results.push({
+        ksef: null, enova: e,
+        status: e.ozn_ksef === 'BFK' ? 'bfk' : 'no_ksef',
+        issues: [`Brak pliku KSeF dla: ${e.nr_dok || e.nr_ewid} ${reason}`]
+      });
+    }
+  });
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════
+function badge(status) {
+  const cfg = {
+    ok:        ['badge-ok',    '✓ Zgodna'],
+    mismatch:  ['badge-bad',   '✗ Niezgodność'],
+    not_found: ['badge-warn',  '⚠ Brak w rejestrze'],
+    no_ksef:   ['badge-purple','⚠ Brak KSeF'],
+    bfk:       ['badge-gray',  '○ BFK'],
+    xml_error: ['badge-bad',   '✗ Błąd XML'],
+  };
+  const [cls,lbl] = cfg[status] || ['badge-bad','?'];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function cellCmp(a, b) {
+  if (!a && !b) return '<span class="cell-nil">—</span>';
+  if (!a) return esc(b||'');
+  if (!b) return esc(a||'');
+  if (String(a) === String(b)) return esc(a);
+  return `<span class="cell-old">${esc(a)}</span><span class="cell-new">${esc(b)}</span>`;
+}
+
+function buildTbody(results) {
+  const filtered = results.filter(r => {
+    if (currentFilter !== 'all' && r.status !== currentFilter) return false;
+    if (searchText) {
+      const haystack = [
+        r.enova?.nr_dok, r.enova?.nr_ewid, r.enova?.kontrahent, r.enova?.nip,
+        r.ksef?.nrFaktury, r.ksef?.nrKsef, r.ksef?.fileName
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(searchText.toLowerCase())) return false;
+    }
+    return true;
+  });
+
+  if (!filtered.length) return `<tr><td colspan="11" style="text-align:center;padding:24px;color:#94a3b8">Brak wyników dla wybranych filtrów</td></tr>`;
+
+  return filtered.map((r, i) => {
+    const nr = esc(r.enova?.nr_dok || r.ksef?.nrFaktury || r.enova?.nr_ewid || '—');
+    const nrEwid = esc(r.enova?.nr_ewid || '—');
+    const kontrahent = esc(r.enova?.kontrahent || '—');
+    const exp = expandedRows.has(i);
+    const originalIdx = results.indexOf(r);
+
+    const main = `<tr class="row-data">
+      <td>${badge(r.status)}</td>
+      <td title="${esc(r.enova?.nr_ewid||'')}" style="font-weight:600">${nr}</td>
+      <td style="color:#64748b;font-size:11.5px">${nrEwid}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${kontrahent}">${kontrahent}</td>
+      <td>${cellCmp(r.enova?.data_dok, r.ksef?.dataWyst)}</td>
+      <td>${esc(r.ksef?.dataSprz || '—')}</td>
+      <td>${fmt(r.enova?.netto)}</td>
+      <td>${fmt(r.ksef?.netto)}</td>
+      <td>${fmt(r.enova?.vat)}</td>
+      <td>${fmt(r.ksef?.vat)}</td>
+      <td>${r.issues?.length ? `<button class="btn-toggle" onclick="toggleRow(${originalIdx})">${exp?'▲ Ukryj':'▼ '+r.issues.length+' uwag'}</button>` : ''}</td>
+    </tr>`;
+
+    const expRow = (exp && r.issues?.length) ? `<tr class="tr-expand"><td colspan="11">
+      <ul class="issues">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    </td></tr>` : '';
+
+    return main + expRow;
+  }).join('');
+}
+
+function toggleRow(i) {
+  expandedRows.has(i) ? expandedRows.delete(i) : expandedRows.add(i);
+  document.getElementById('tbody').innerHTML = buildTbody(lastResults);
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-'+f).classList.add('active');
+  document.getElementById('tbody').innerHTML = buildTbody(lastResults);
+}
+
+function renderResults(register, ksefDocs, results) {
+  lastResults = results;
+  expandedRows.clear();
+
+  const counts = results.reduce((a,r) => { a[r.status]=(a[r.status]||0)+1; return a; }, {});
+
+  const meta = `<div class="reg-meta">
+    <div><span>Firma: </span><strong>${esc(register.firma||'—')}</strong></div>
+    <div><span>NIP: </span><strong>${esc(register.nip||'—')}</strong></div>
+    <div><span>Rejestr: </span><strong>${register.typRejestru === 'zakup' ? '📥 Zakup (naliczony)' : register.typRejestru === 'sprzedaz' ? '📤 Sprzedaż (należny)' : '—'}</strong></div>
+    <div><span>Okres: </span><strong>${esc(register.okres||'—')}</strong></div>
+    <div><span>Pozycji w rejestrze: </span><strong>${register.entries.length}</strong></div>
+    <div><span>Pliki KSeF: </span><strong>${ksefDocs.length}</strong></div>
+  </div>`;
+
+  const summary = `<div class="summary">
+    <div class="sum-box sum-ok">✓ Zgodne<span class="num">${counts.ok||0}</span></div>
+    <div class="sum-box sum-bad">✗ Niezgodności<span class="num">${counts.mismatch||0}</span></div>
+    <div class="sum-box sum-warn">⚠ Brak w rej.<span class="num">${counts.not_found||0}</span></div>
+    <div class="sum-box sum-purple">⚠ Brak KSeF<span class="num">${counts.no_ksef||0}</span></div>
+    <div class="sum-box sum-gray">○ BFK<span class="num">${counts.bfk||0}</span></div>
+    ${counts.xml_error ? `<div class="sum-box sum-bad">✗ Błąd XML<span class="num">${counts.xml_error}</span></div>` : ''}
+  </div>`;
+
+  const tabs = `<div class="tabs">
+    <button id="tab-all"       class="tab active" onclick="setFilter('all')">Wszystkie (${results.length})</button>
+    <button id="tab-mismatch"  class="tab" onclick="setFilter('mismatch')">Niezgodności (${counts.mismatch||0})</button>
+    <button id="tab-not_found" class="tab" onclick="setFilter('not_found')">Brak w rejestrze (${counts.not_found||0})</button>
+    <button id="tab-no_ksef"   class="tab" onclick="setFilter('no_ksef')">Brak KSeF (${counts.no_ksef||0})</button>
+    <button id="tab-ok"        class="tab" onclick="setFilter('ok')">Zgodne (${counts.ok||0})</button>
+  </div>`;
+
+  const filterBar = `<div class="filter-bar">
+    <input type="text" placeholder="🔎 Szukaj po numerze, kontrahencie, NIP..." oninput="searchText=this.value;document.getElementById('tbody').innerHTML=buildTbody(lastResults)" />
+    <button class="btn-export" onclick="exportCsv()">⬇ Eksportuj CSV</button>
+  </div>`;
+
+  const table = `<div class="tbl-wrap"><div class="tbl-scroll"><table>
+    <thead><tr>
+      <th>Status</th><th>Nr dok. dostawcy</th><th>Nr ewidencyjny</th><th>Kontrahent</th>
+      <th>Data dok.</th><th>Data sprzedaży (KSeF)</th>
+      <th>Netto (Enova)</th><th>Netto (KSeF)</th>
+      <th>VAT (Enova)</th><th>VAT (KSeF)</th>
+      <th>Szczegóły</th>
+    </tr></thead>
+    <tbody id="tbody">${buildTbody(results)}</tbody>
+  </table></div></div>`;
+
+  document.getElementById('results').innerHTML = meta + summary + tabs + filterBar + table;
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════════════
+function exportCsv() {
+  if (!lastResults) return;
+  const statusLbl = { ok:'Zgodna', mismatch:'Niezgodność', not_found:'Brak w rejestrze', no_ksef:'Brak KSeF', bfk:'BFK', xml_error:'Błąd XML' };
+  const rows = [['Status','Nr dok. dostawcy','Nr ewidencyjny','Kontrahent','NIP','Data dok. (Enova)','Data wyst. (KSeF)','Data sprz. (KSeF)','Netto (Enova)','Netto (KSeF)','VAT (Enova)','VAT (KSeF)','Brutto (Enova)','Brutto (KSeF)','Nr KSeF (Enova)','Nr KSeF (XML)','Oznaczenie KSeF','Plik XML','Uwagi']];
+  lastResults.forEach(r => rows.push([
+    statusLbl[r.status]||r.status,
+    r.enova?.nr_dok || r.ksef?.nrFaktury || '',
+    r.enova?.nr_ewid || '',
+    r.enova?.kontrahent || '',
+    r.enova?.nip || '',
+    r.enova?.data_dok || '',
+    r.ksef?.dataWyst || '',
+    r.ksef?.dataSprz || '',
+    r.enova?.netto ?? '',
+    r.ksef?.netto ?? '',
+    r.enova?.vat ?? '',
+    r.ksef?.vat ?? '',
+    r.enova?.brutto ?? '',
+    r.ksef?.brutto ?? '',
+    r.enova?.nr_ksef || '',
+    r.ksef?.nrKsef || '',
+    r.enova?.ozn_ksef || '',
+    r.ksef?.fileName || '',
+    (r.issues||[]).join(' | '),
+  ]));
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  const blob = new Blob(['\uFEFF'+csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `weryfikacja_vat_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════════════════
+async function runAnalysis() {
+  document.getElementById('btnAnalyze').disabled = true;
+  document.getElementById('results').innerHTML = '';
+  setMsg('');
+
+  try {
+    setMsg('<div class="msg-info"><div class="spinner"></div>Wczytuję rejestr Enova (XLSX)...</div>');
+    const ab = await readFileAsArrayBuffer(xlsxFile);
+    const register = parseEnovaXlsx(ab);
+    if (!register.entries.length) throw new Error('Nie znaleziono żadnych pozycji w pliku XLSX. Sprawdź czy to prawidłowy eksport z Enova 365.');
+
+    setMsg('<div class="msg-info"><div class="spinner"></div>Parsowanie pliku JPK_FA (XML)...</div>');
+    // JPK_FA: each file contains multiple invoices — flatten all
+    const ksefDocsNested = await Promise.all(xmlFiles.map(async f => parseJpkFaXml(await readFileAsText(f), f.name)));
+    const ksefDocs = ksefDocsNested.flat();
+
+    setMsg('<div class="msg-info"><div class="spinner"></div>Porównuję dokumenty...</div>');
+    const results = compare(register.entries, ksefDocs);
+
+    setMsg('');
+    renderResults(register, ksefDocs, results);
+  } catch(e) {
+    setMsg(`<div class="msg-error"><strong>Błąd:</strong> ${esc(e.message)}</div>`);
+  } finally {
+    checkReady();
+  }
+}
+</script>
+</body>
+</html>
