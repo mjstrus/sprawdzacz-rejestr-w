@@ -609,11 +609,18 @@ function compare(enovaEntries, ksefDocs) {
       (e.nr_ksef && k.nrKsef    && norm(e.nr_ksef) === norm(k.nrKsef))
     );
     if (!found) {
-      const reason = e.ozn_ksef === 'BFK' ? '(oznaczone BFK — brak obowiązku KSeF)' : '';
+      const ozn = (e.ozn_ksef || '').toUpperCase();
+      const nrDok = (e.nr_dok || '').toLowerCase();
+      const isBfk = ozn === 'BFK';
+      const isDI  = ozn === 'DI';
+      const isFiskalny = /raport|paragon|rap\.\s*fisk|rap\s+fisk/i.test(nrDok);
+      let status, reason;
+      if (isBfk)                   { status = 'bfk'; reason = '(BFK — brak obowiązku KSeF)'; }
+      else if (isDI || isFiskalny) { status = 'di';  reason = '(dok. wewnętrzny / fiskalny — poza KSeF)'; }
+      else                         { status = 'no_ksef'; reason = ''; }
       results.push({
-        ksef: null, enova: e,
-        status: e.ozn_ksef === 'BFK' ? 'bfk' : 'no_ksef',
-        issues: [`Brak pliku KSeF dla: ${e.nr_dok || e.nr_ewid} ${reason}`]
+        ksef: null, enova: e, status,
+        issues: [('Brak pliku KSeF dla: ' + (e.nr_dok || e.nr_ewid) + ' ' + reason).trim()]
       });
     }
   });
@@ -631,6 +638,7 @@ function badge(status) {
     not_found: ['badge-warn',  '⚠ Brak w rejestrze'],
     no_ksef:   ['badge-purple','⚠ Brak KSeF'],
     bfk:       ['badge-gray',  '○ BFK'],
+    di:        ['badge-gray',  '○ Dok. wewn.'],
     xml_error: ['badge-bad',   '✗ Błąd XML'],
   };
   const [cls,lbl] = cfg[status] || ['badge-bad','?'];
@@ -722,6 +730,7 @@ function renderResults(register, ksefDocs, results) {
     <div class="sum-box sum-warn">⚠ Brak w rej.<span class="num">${counts.not_found||0}</span></div>
     <div class="sum-box sum-purple">⚠ Brak KSeF<span class="num">${counts.no_ksef||0}</span></div>
     <div class="sum-box sum-gray">○ BFK<span class="num">${counts.bfk||0}</span></div>
+    <div class="sum-box sum-gray" style="background:#f8fafc">○ Dok. wewn.<span class="num">${counts.di||0}</span></div>
     ${counts.xml_error ? `<div class="sum-box sum-bad">✗ Błąd XML<span class="num">${counts.xml_error}</span></div>` : ''}
   </div>`;
 
@@ -730,6 +739,7 @@ function renderResults(register, ksefDocs, results) {
     <button id="tab-mismatch"  class="tab" onclick="setFilter('mismatch')">Niezgodności (${counts.mismatch||0})</button>
     <button id="tab-not_found" class="tab" onclick="setFilter('not_found')">Brak w rejestrze (${counts.not_found||0})</button>
     <button id="tab-no_ksef"   class="tab" onclick="setFilter('no_ksef')">Brak KSeF (${counts.no_ksef||0})</button>
+    <button id="tab-di"         class="tab" onclick="setFilter('di')">Dok. wewn. (${counts.di||0})</button>
     <button id="tab-ok"        class="tab" onclick="setFilter('ok')">Zgodne (${counts.ok||0})</button>
   </div>`;
 
@@ -961,7 +971,7 @@ function renderWlSection(nipsCount) {
 // ═══════════════════════════════════════════════════════
 function exportCsv() {
   if (!lastResults) return;
-  const statusLbl = { ok:'Zgodna', mismatch:'Niezgodność', not_found:'Brak w rejestrze', no_ksef:'Brak KSeF', bfk:'BFK', xml_error:'Błąd XML' };
+  const statusLbl = { ok:'Zgodna', mismatch:'Niezgodność', not_found:'Brak w rejestrze', no_ksef:'Brak KSeF', bfk:'BFK', di:'Dok. wewnętrzny', xml_error:'Błąd XML' };
   const rows = [['Status','Nr dok. dostawcy','Nr ewidencyjny','Kontrahent','NIP','Data dok. (Enova)','Data wyst. (KSeF)','Data sprz. (KSeF)','Netto (Enova)','Netto (KSeF)','VAT (Enova)','VAT (KSeF)','Brutto (Enova)','Brutto (KSeF)','Nr KSeF (Enova)','Nr KSeF (XML)','Oznaczenie KSeF','Plik XML','Uwagi']];
   lastResults.forEach(r => rows.push([
     statusLbl[r.status]||r.status,
