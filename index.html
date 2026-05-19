@@ -66,6 +66,40 @@
     }
     @media(max-width: 640px) { .upload-grid { grid-template-columns: 1fr; } }
 
+    /* REGISTER TYPE TOGGLE */
+    .register-toggle {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      align-items: center;
+    }
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .toggle-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all .2s;
+      flex: 0 1 auto;
+    }
+    .toggle-btn.active {
+      background: #1d4ed8;
+      color: #fff;
+    }
+    .toggle-btn:hover:not(.active) {
+      background: #cbd5e1;
+    }
+
     .dropzone {
       border: 2px dashed #cbd5e1;
       border-radius: 10px;
@@ -233,6 +267,11 @@
 
   <!-- UPLOAD -->
   <div class="card">
+    <div class="register-toggle">
+      <span class="toggle-label">Typ rejestru:</span>
+      <button class="toggle-btn active" id="toggle-zakup" onclick="setRegisterType('zakup')">📥 Zakup (naliczony)</button>
+      <button class="toggle-btn" id="toggle-sprzedaz" onclick="setRegisterType('sprzedaz')">📤 Sprzedaż (należny)</button>
+    </div>
     <div class="card-title">1. Wgraj pliki</div>
     <div class="upload-grid">
 
@@ -297,6 +336,7 @@
 // ═══════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════
+let registerType = 'zakup'; // 'zakup' or 'sprzedaz'
 let xlsxFile = null;
 let xmlFiles = [];
 let expandedRows = new Set();
@@ -304,6 +344,28 @@ let currentFilter = 'all';
 let searchText = '';
 let lastResults = null;
 let lastRegister = null;
+
+// ═══════════════════════════════════════════════════════
+// REGISTER TYPE TOGGLE
+// ═══════════════════════════════════════════════════════
+function setRegisterType(type) {
+  registerType = type;
+  document.getElementById('toggle-zakup').classList.toggle('active', type === 'zakup');
+  document.getElementById('toggle-sprzedaz').classList.toggle('active', type === 'sprzedaz');
+  // Clear previous results when switching types
+  xlsxFile = null;
+  xmlFiles = [];
+  expandedRows.clear();
+  document.getElementById('xlsxContent').innerHTML = `
+    <div class="dz-icon">📊</div>
+    <div class="dz-title">Upuść plik XLSX lub kliknij</div>
+    <div class="dz-sub">Rejestr VAT naliczony lub należny</div>`;
+  document.getElementById('xlsxZone').classList.remove('filled');
+  renderXmlZone();
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('wlSection').style.display = 'none';
+  checkReady();
+}
 
 // ═══════════════════════════════════════════════════════
 // DRAG & DROP
@@ -502,21 +564,23 @@ function parseJpkFaXml(xmlText, fileName) {
     if (!faktury.length) throw new Error('Brak tagów <Faktura> w pliku');
 
     return faktury.map(f => {
-      // Sumy per stawka: P_13_1=23%, P_13_2=8%, P_13_3=5%
-      //                  P_14_1=23%, P_14_2=8%, P_14_3=5%
+      // Sumy per stawka: P_13_1=23%, P_13_2=8%, P_13_3=5%, P_13_4=0% (ZW)
+      //                  P_14_1=23%, P_14_2=8%, P_14_3=5%, P_14_4=0% (ZW)
       const netto23 = getNum(f,'P_13_1'), vat23 = getNum(f,'P_14_1');
       const netto8  = getNum(f,'P_13_2'), vat8  = getNum(f,'P_14_2');
       const netto5  = getNum(f,'P_13_3'), vat5  = getNum(f,'P_14_3');
+      const netto0  = getNum(f,'P_13_4'), vat0  = getNum(f,'P_14_4'); // ZW (zwolnione)
       const brutto  = getNum(f,'P_15');
 
-      const netto = Math.round(([netto23,netto8,netto5].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
-      const vat   = Math.round(([vat23,vat8,vat5].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
+      const netto = Math.round(([netto23,netto8,netto5,netto0].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
+      const vat   = Math.round(([vat23,vat8,vat5,vat0].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
 
       // Stawki obecne w fakturze
       const stawki = [];
       if (netto23 != null) stawki.push('23%');
       if (netto8  != null) stawki.push('8%');
       if (netto5  != null) stawki.push('5%');
+      if (netto0  != null) stawki.push('zw');
 
       return {
         fileName,
@@ -524,10 +588,11 @@ function parseJpkFaXml(xmlText, fileName) {
         nrKsef:    null, // JPK_FA nie zawiera numeru KSeF
         dataWyst:  getVal(f,'P_1'),
         dataSprz:  getVal(f,'P_6') || getVal(f,'P_1'),
-        nipSprzed: getVal(f,'P_4B'),
+        nipSprzed: getVal(f,'P_4B'),     // NIP sprzedawcy
+        nipOdbor:  getVal(f,'P_3A'),     // NIP odbiorcy
         kontrahent:getVal(f,'P_3C'),
         adresSprz: getVal(f,'P_3D'), // adres sprzedawcy na fakturze
-        netto23, vat23, netto8, vat8, netto5, vat5,
+        netto23, vat23, netto8, vat8, netto5, vat5, netto0, vat0,
         netto:  netto || null,
         vat:    vat   || null,
         brutto: brutto|| null,
@@ -542,22 +607,33 @@ function parseJpkFaXml(xmlText, fileName) {
 // ═══════════════════════════════════════════════════════
 // COMPARISON
 // ═══════════════════════════════════════════════════════
-function compare(enovaEntries, ksefDocs) {
+function compare(enovaEntries, ksefDocs, regType = 'zakup') {
   const TOL = 0.02;
   const norm = s => String(s||'').replace(/[\s\/\-]/g,'').toUpperCase();
   const results = [];
 
-  // For each KSeF doc — find match in Enova by nr_dok or nr_ksef
+  // For each KSeF doc — find match in Enova by (nr_dok + NIP)
   ksefDocs.forEach(ksef => {
     if (ksef.error) {
       results.push({ ksef, enova: null, status: 'xml_error', issues: [`Błąd XML: ${ksef.error}`] });
       return;
     }
 
-    const match = enovaEntries.find(e =>
-      (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok)  === norm(ksef.nrFaktury)) ||
-      (e.nr_ksef && ksef.nrKsef    && norm(e.nr_ksef) === norm(ksef.nrKsef))
-    );
+    // Matching logic depends on register type
+    let match;
+    if (regType === 'zakup') {
+      // ZAKUP: match by (nr_dok + nipSprzedawcy)
+      match = enovaEntries.find(e =>
+        (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok) === norm(ksef.nrFaktury)) &&
+        (e.nip && ksef.nipSprzed && norm(e.nip) === norm(ksef.nipSprzed))
+      );
+    } else {
+      // SPRZEDAŻ: match by (nr_dok + nipSprzedawcy zawsze, bo to Ty)
+      match = enovaEntries.find(e =>
+        (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok) === norm(ksef.nrFaktury)) &&
+        (e.nip && ksef.nipSprzed && norm(e.nip) === norm(ksef.nipSprzed))
+      );
+    }
 
     if (!match) {
       results.push({ ksef, enova: null, status: 'not_found', issues: [`Faktura ${ksef.nrFaktury || ksef.nrKsef || '?'} nie znaleziona w rejestrze Enova`] });
@@ -604,10 +680,18 @@ function compare(enovaEntries, ksefDocs) {
 
   // Enova entries without matching KSeF file
   enovaEntries.forEach(e => {
-    const found = ksefDocs.find(k =>
-      (e.nr_dok  && k.nrFaktury && norm(e.nr_dok)  === norm(k.nrFaktury)) ||
-      (e.nr_ksef && k.nrKsef    && norm(e.nr_ksef) === norm(k.nrKsef))
-    );
+    let found;
+    if (regType === 'zakup') {
+      found = ksefDocs.find(k =>
+        (e.nr_dok  && k.nrFaktury && norm(e.nr_dok) === norm(k.nrFaktury)) &&
+        (e.nip && k.nipSprzed && norm(e.nip) === norm(k.nipSprzed))
+      );
+    } else {
+      found = ksefDocs.find(k =>
+        (e.nr_dok  && k.nrFaktury && norm(e.nr_dok) === norm(k.nrFaktury)) &&
+        (e.nip && k.nipSprzed && norm(e.nip) === norm(k.nipSprzed))
+      );
+    }
     if (!found) {
       const ozn = (e.ozn_ksef || '').toUpperCase();
       const nrDok = (e.nr_dok || '').toLowerCase();
@@ -666,7 +750,7 @@ function buildTbody(results) {
     return true;
   });
 
-  if (!filtered.length) return `<tr><td colspan="11" style="text-align:center;padding:24px;color:#94a3b8">Brak wyników dla wybranych filtrów</td></tr>`;
+  if (!filtered.length) return `<tr><td colspan="12" style="text-align:center;padding:24px;color:#94a3b8">Brak wyników dla wybranych filtrów</td></tr>`;
 
   return filtered.map((r, i) => {
     const nr = esc(r.enova?.nr_dok || r.ksef?.nrFaktury || r.enova?.nr_ewid || '—');
@@ -682,6 +766,7 @@ function buildTbody(results) {
       <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${kontrahent}">${kontrahent}</td>
       <td>${cellCmp(r.enova?.data_dok, r.ksef?.dataWyst)}</td>
       <td>${esc(r.ksef?.dataSprz || '—')}</td>
+      <td style="font-weight:600;color:#1e40af"><span title="Stawki VAT z faktury KSeF">${esc(r.ksef?.stawki || '—')}</span></td>
       <td>${fmt(r.enova?.netto)}</td>
       <td>${fmt(r.ksef?.netto)}</td>
       <td>${fmt(r.enova?.vat)}</td>
@@ -689,7 +774,7 @@ function buildTbody(results) {
       <td>${r.issues?.length ? `<button class="btn-toggle" onclick="toggleRow(${originalIdx})">${exp?'▲ Ukryj':'▼ '+r.issues.length+' uwag'}</button>` : ''}</td>
     </tr>`;
 
-    const expRow = (exp && r.issues?.length) ? `<tr class="tr-expand"><td colspan="11">
+    const expRow = (exp && r.issues?.length) ? `<tr class="tr-expand"><td colspan="12">
       <ul class="issues">${r.issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
     </td></tr>` : '';
 
@@ -752,6 +837,7 @@ function renderResults(register, ksefDocs, results) {
     <thead><tr>
       <th>Status</th><th>Nr dok. dostawcy</th><th>Nr ewidencyjny</th><th>Kontrahent</th>
       <th>Data dok.</th><th>Data sprzedaży (KSeF)</th>
+      <th>Stawki VAT</th>
       <th>Netto (Enova)</th><th>Netto (KSeF)</th>
       <th>VAT (Enova)</th><th>VAT (KSeF)</th>
       <th>Szczegóły</th>
@@ -972,7 +1058,7 @@ function renderWlSection(nipsCount) {
 function exportCsv() {
   if (!lastResults) return;
   const statusLbl = { ok:'Zgodna', mismatch:'Niezgodność', not_found:'Brak w rejestrze', no_ksef:'Brak KSeF', bfk:'BFK', di:'Dok. wewnętrzny', xml_error:'Błąd XML' };
-  const rows = [['Status','Nr dok. dostawcy','Nr ewidencyjny','Kontrahent','NIP','Data dok. (Enova)','Data wyst. (KSeF)','Data sprz. (KSeF)','Netto (Enova)','Netto (KSeF)','VAT (Enova)','VAT (KSeF)','Brutto (Enova)','Brutto (KSeF)','Nr KSeF (Enova)','Nr KSeF (XML)','Oznaczenie KSeF','Plik XML','Uwagi']];
+  const rows = [['Status','Nr dok. dostawcy','Nr ewidencyjny','Kontrahent','NIP','Data dok. (Enova)','Data wyst. (KSeF)','Data sprz. (KSeF)','Stawki VAT','Netto (Enova)','Netto (KSeF)','VAT (Enova)','VAT (KSeF)','Brutto (Enova)','Brutto (KSeF)','Nr KSeF (Enova)','Nr KSeF (XML)','Oznaczenie KSeF','Plik XML','Uwagi']];
   lastResults.forEach(r => rows.push([
     statusLbl[r.status]||r.status,
     r.enova?.nr_dok || r.ksef?.nrFaktury || '',
@@ -982,6 +1068,7 @@ function exportCsv() {
     r.enova?.data_dok || '',
     r.ksef?.dataWyst || '',
     r.ksef?.dataSprz || '',
+    r.ksef?.stawki || '',
     r.enova?.netto ?? '',
     r.ksef?.netto ?? '',
     r.enova?.vat ?? '',
@@ -1022,7 +1109,7 @@ async function runAnalysis() {
     const ksefDocs = ksefDocsNested.flat();
 
     setMsg('<div class="msg-info"><div class="spinner"></div>Porównuję dokumenty...</div>');
-    const results = compare(register.entries, ksefDocs);
+    const results = compare(register.entries, ksefDocs, registerType);
 
     setMsg('');
     renderResults(register, ksefDocs, results);
