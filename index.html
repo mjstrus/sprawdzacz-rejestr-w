@@ -752,12 +752,12 @@ function buildTbody(results) {
 
   if (!filtered.length) return `<tr><td colspan="12" style="text-align:center;padding:24px;color:#94a3b8">Brak wyników dla wybranych filtrów</td></tr>`;
 
-  return filtered.map((r, i) => {
+  return filtered.map((r) => {
     const nr = esc(r.enova?.nr_dok || r.ksef?.nrFaktury || r.enova?.nr_ewid || '—');
     const nrEwid = esc(r.enova?.nr_ewid || '—');
     const kontrahent = esc(r.enova?.kontrahent || '—');
-    const exp = expandedRows.has(i);
-    const originalIdx = results.indexOf(r);
+    const resultIdx = results.indexOf(r);
+    const exp = expandedRows.has(resultIdx);
 
     const main = `<tr class="row-data">
       <td>${badge(r.status)}</td>
@@ -771,7 +771,7 @@ function buildTbody(results) {
       <td>${fmt(r.ksef?.netto)}</td>
       <td>${fmt(r.enova?.vat)}</td>
       <td>${fmt(r.ksef?.vat)}</td>
-      <td>${r.issues?.length ? `<button class="btn-toggle" onclick="toggleRow(${originalIdx})">${exp?'▲ Ukryj':'▼ '+r.issues.length+' uwag'}</button>` : ''}</td>
+      <td>${r.issues?.length ? `<button class="btn-toggle" onclick="toggleRow(${resultIdx})">${exp?'▲ Ukryj':'▼ '+r.issues.length+' uwag'}</button>` : ''}</td>
     </tr>`;
 
     const expRow = (exp && r.issues?.length) ? `<tr class="tr-expand"><td colspan="12">
