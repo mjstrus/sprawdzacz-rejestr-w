@@ -564,12 +564,12 @@ function parseJpkFaXml(xmlText, fileName) {
     if (!faktury.length) throw new Error('Brak tagów <Faktura> w pliku');
 
     return faktury.map(f => {
-      // Sumy per stawka: P_13_1=23%, P_13_2=8%, P_13_3=5%, P_13_4=0% (ZW)
-      //                  P_14_1=23%, P_14_2=8%, P_14_3=5%, P_14_4=0% (ZW)
+      // Sumy per stawka: P_13_1=23%, P_13_2=8%, P_13_3=5%, P_13_7=0% (ZW)
+      //                  P_14_1=23%, P_14_2=8%, P_14_3=5%, (P_14_7 nie istnieje, zawsze 0)
       const netto23 = getNum(f,'P_13_1'), vat23 = getNum(f,'P_14_1');
       const netto8  = getNum(f,'P_13_2'), vat8  = getNum(f,'P_14_2');
       const netto5  = getNum(f,'P_13_3'), vat5  = getNum(f,'P_14_3');
-      const netto0  = getNum(f,'P_13_4'), vat0  = getNum(f,'P_14_4'); // ZW (zwolnione)
+      const netto0  = getNum(f,'P_13_7'), vat0  = 0; // P_13_7 to ZW (zwolnione) — Saldeo format
       const brutto  = getNum(f,'P_15');
 
       const netto = Math.round(([netto23,netto8,netto5,netto0].filter(Boolean).reduce((a,b)=>a+b,0))*100)/100;
