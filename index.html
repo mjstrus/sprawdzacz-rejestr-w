@@ -649,13 +649,13 @@ function compare(enovaEntries, ksefDocs, regType = 'zakup') {
     // Matching logic depends on register type
     let match;
     
-    // Check if this is a fiscal report (raport fiskalny) - they match by nr_ewid only
+    // Check if this is a fiscal report - they have no NIP in Enova
     const isFiscalReport = ksef.nrFaktury && String(ksef.nrFaktury).includes('Rap.');
     
     if (isFiscalReport) {
-      // Fiscal reports: match by nr_ewid only (no NIP)
+      // Fiscal reports: match by nr_dok only (no NIP)
       match = enovaEntries.find(e =>
-        (e.nr_ewid && ksef.nrFaktury && norm(e.nr_ewid) === norm(ksef.nrFaktury))
+        (e.nr_dok && ksef.nrFaktury && norm(e.nr_dok) === norm(ksef.nrFaktury))
       );
     } else if (regType === 'zakup') {
       // ZAKUP: match by (nr_dok + nipSprzedawcy)
@@ -718,7 +718,14 @@ function compare(enovaEntries, ksefDocs, regType = 'zakup') {
   // Enova entries without matching KSeF file
   enovaEntries.forEach(e => {
     let found;
-    if (regType === 'zakup') {
+    const isFiscalReport = e.nr_dok && String(e.nr_dok).includes('Rap.');
+    
+    if (isFiscalReport) {
+      // Fiscal reports: match by nr_dok only
+      found = ksefDocs.find(k =>
+        (e.nr_dok && k.nrFaktury && norm(e.nr_dok) === norm(k.nrFaktury))
+      );
+    } else if (regType === 'zakup') {
       found = ksefDocs.find(k =>
         (e.nr_dok  && k.nrFaktury && norm(e.nr_dok) === norm(k.nrFaktury)) &&
         (e.nip && k.nipSprzed && norm(e.nip) === norm(k.nipSprzed))
