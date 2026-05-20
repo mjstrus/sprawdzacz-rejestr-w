@@ -485,6 +485,8 @@ function parseEnovaXlsx(arrayBuffer) {
   }
   if (headerRow < 0) throw new Error('Nie znaleziono nagłówka tabeli (szukam "Lp.")');
 
+  console.log(`DEBUG: headerRow=${headerRow}, total rows=${rows.length}`);
+
   const entries = [];
   let i = headerRow + 2; // skip both header rows
 
@@ -492,16 +494,21 @@ function parseEnovaXlsx(arrayBuffer) {
     const r1 = rows[i];
     const r2 = rows[i+1] || [];
 
+    console.log(`DEBUG: i=${i}, r1[0]=${r1[0]} (type=${typeof r1[0]}), r2[2]=${r2[2]}`);
+
     // Stop at summary/footer
     if (r1[2] === 'Suma:' || r1[0] === '1/1' || (typeof r1[0] === 'string' && r1[0].includes('Data i czas'))) break;
 
     if (typeof r1[0] === 'number') {
+      console.log(`DEBUG: Parsing entry at i=${i}`);
       // Parse kontrahent field: "Nazwa\nNIP adres"
       const podmiotRaw = String(r1[4] || '');
       const lines = podmiotRaw.split('\n');
       const nazwa = lines[0].trim();
       const nipAdres = lines[1] ? lines[1].trim() : '';
       const nipKtr = nipAdres.split(' ')[0] || null;
+
+      console.log(`DEBUG: nazwa=${nazwa}, nip=${nipKtr}, nr_dok=${r2[2]}`);
 
       entries.push({
         lp:              r1[0],
@@ -530,6 +537,8 @@ function parseEnovaXlsx(arrayBuffer) {
       i++;
     }
   }
+
+  console.log(`DEBUG: Final entries count=${entries.length}`);
 
   return { firma, nip, okres, typRejestru, entries };
 }
