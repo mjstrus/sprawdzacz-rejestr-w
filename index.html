@@ -589,7 +589,7 @@ function parseJpkFaXml(xmlText, fileName) {
         dataWyst:  getVal(f,'P_1'),
         dataSprz:  getVal(f,'P_6') || getVal(f,'P_1'),
         nipSprzed: getVal(f,'P_4B'),     // NIP sprzedawcy
-        nipOdbor:  getVal(f,'P_3A'),     // NIP odbiorcy
+        nipOdbor:  getVal(f,'P_5B'),     // NIP odbiorcy (P_5B, nie P_3A!)
         kontrahent:getVal(f,'P_3C'),
         adresSprz: getVal(f,'P_3D'), // adres sprzedawcy na fakturze
         netto23, vat23, netto8, vat8, netto5, vat5, netto0, vat0,
