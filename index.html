@@ -628,10 +628,11 @@ function compare(enovaEntries, ksefDocs, regType = 'zakup') {
         (e.nip && ksef.nipSprzed && norm(e.nip) === norm(ksef.nipSprzed))
       );
     } else {
-      // SPRZEDAŻ: match by (nr_dok + nipSprzedawcy zawsze, bo to Ty)
+      // SPRZEDAŻ: match by (nr_dok + nipOdbor z P_3A)
+      // W sprzedaży: Enova ma NIP odbiorcy, KSeF ma NIP odbiorcy w P_3A
       match = enovaEntries.find(e =>
         (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok) === norm(ksef.nrFaktury)) &&
-        (e.nip && ksef.nipSprzed && norm(e.nip) === norm(ksef.nipSprzed))
+        (e.nip && ksef.nipOdbor && norm(e.nip) === norm(ksef.nipOdbor))
       );
     }
 
@@ -687,9 +688,10 @@ function compare(enovaEntries, ksefDocs, regType = 'zakup') {
         (e.nip && k.nipSprzed && norm(e.nip) === norm(k.nipSprzed))
       );
     } else {
+      // SPRZEDAŻ: match by nip odbior (P_3A)
       found = ksefDocs.find(k =>
         (e.nr_dok  && k.nrFaktury && norm(e.nr_dok) === norm(k.nrFaktury)) &&
-        (e.nip && k.nipSprzed && norm(e.nip) === norm(k.nipSprzed))
+        (e.nip && k.nipOdbor && norm(e.nip) === norm(k.nipOdbor))
       );
     }
     if (!found) {
