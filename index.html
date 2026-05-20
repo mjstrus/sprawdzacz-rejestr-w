@@ -485,8 +485,6 @@ function parseEnovaXlsx(arrayBuffer) {
   }
   if (headerRow < 0) throw new Error('Nie znaleziono nagłówka tabeli (szukam "Lp.")');
 
-  console.log(`DEBUG: headerRow=${headerRow}, total rows=${rows.length}`);
-
   const entries = [];
   let i = headerRow + 2; // skip both header rows
 
@@ -494,21 +492,17 @@ function parseEnovaXlsx(arrayBuffer) {
     const r1 = rows[i];
     const r2 = rows[i+1] || [];
 
-    console.log(`DEBUG: i=${i}, r1[0]=${r1[0]} (type=${typeof r1[0]}), r2[2]=${r2[2]}`);
-
     // Stop at summary/footer
     if (r1[2] === 'Suma:' || r1[0] === '1/1' || (typeof r1[0] === 'string' && r1[0].includes('Data i czas'))) break;
 
+    // Regular entries: Lp. is number (1, 2, 3, ...)
     if (typeof r1[0] === 'number') {
-      console.log(`DEBUG: Parsing entry at i=${i}`);
       // Parse kontrahent field: "Nazwa\nNIP adres"
       const podmiotRaw = String(r1[4] || '');
       const lines = podmiotRaw.split('\n');
       const nazwa = lines[0].trim();
       const nipAdres = lines[1] ? lines[1].trim() : '';
       const nipKtr = nipAdres.split(' ')[0] || null;
-
-      console.log(`DEBUG: nazwa=${nazwa}, nip=${nipKtr}, nr_dok=${r2[2]}`);
 
       entries.push({
         lp:              r1[0],
@@ -533,12 +527,36 @@ function parseEnovaXlsx(arrayBuffer) {
         vat:             r2[18] ?? null,
       });
       i += 2;
+    }
+    // Fiscal reports (raporty fiskalne): Lp. is empty, Nr ewid. = "Rap. Fisk. 04/2026 EAO..."
+    else if (!r1[0] && r1[2] && String(r1[2]).includes('Rap.')) {
+      entries.push({
+        lp:              null,
+        nr_ewid:         r1[2] ? String(r1[2]).trim() : null,
+        data_rozrachunku:r1[3] ? String(r1[3]).trim() : null,
+        kontrahent:      null,
+        nip:             null,
+        netto_23:        r1[13] ?? null,
+        netto_8:         r1[14] ?? null,
+        netto_5:         r1[15] ?? null,
+        netto_0:         r1[17] ?? null,
+        netto:           r1[18] ?? null,
+        brutto:          r1[19] ?? null,
+        // Row 2
+        nr_dok:          r2[2] ? String(r2[2]).trim() : null,
+        data_dok:        r2[3] ? String(r2[3]).trim() : null,
+        nr_ksef:         r2[4] ? String(r2[4]).trim() : null,
+        ozn_ksef:        r2[6] ? String(r2[6]).trim() : null,
+        vat_23:          r2[13] ?? null,
+        vat_8:           r2[14] ?? null,
+        vat_5:           r2[15] ?? null,
+        vat:             r2[18] ?? null,
+      });
+      i += 2;
     } else {
       i++;
     }
   }
-
-  console.log(`DEBUG: Final entries count=${entries.length}`);
 
   return { firma, nip, okres, typRejestru, entries };
 }
@@ -630,7 +648,16 @@ function compare(enovaEntries, ksefDocs, regType = 'zakup') {
 
     // Matching logic depends on register type
     let match;
-    if (regType === 'zakup') {
+    
+    // Check if this is a fiscal report (raport fiskalny) - they match by nr_ewid only
+    const isFiscalReport = ksef.nrFaktury && String(ksef.nrFaktury).includes('Rap.');
+    
+    if (isFiscalReport) {
+      // Fiscal reports: match by nr_ewid only (no NIP)
+      match = enovaEntries.find(e =>
+        (e.nr_ewid && ksef.nrFaktury && norm(e.nr_ewid) === norm(ksef.nrFaktury))
+      );
+    } else if (regType === 'zakup') {
       // ZAKUP: match by (nr_dok + nipSprzedawcy)
       match = enovaEntries.find(e =>
         (e.nr_dok  && ksef.nrFaktury && norm(e.nr_dok) === norm(ksef.nrFaktury)) &&
